@@ -9,7 +9,6 @@ import telegram
 
 from dotenv import load_dotenv
 from http import HTTPStatus
-from logging.handlers import RotatingFileHandler
 
 load_dotenv()
 
@@ -34,9 +33,10 @@ HOMEWORK_VERDICTS = {
 logging.basicConfig(
     level=logging.DEBUG,
     filename='main.log',
-    format='%(asctime)s [%(levelname)s] %(funcName)s, Line-%(lineno)s, message-%(message)s',
+    format='%(asctime)s [%(levelname)s] %(funcName)s,'
+    'Line-%(lineno)s, message-%(message)s',
     filemode='w',
-    encoding = 'UTF-8'
+    encoding='UTF-8'
 )
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -49,6 +49,7 @@ def check_tokens():
     # return all[ENV_VARS]
     # return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
     return PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID
+
 
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
@@ -70,7 +71,11 @@ def get_api_answer(timestamp):
     """Делает запрос к единственному эндпоинту API-сервиса."""
     params = {'from_date': timestamp}
     try:
-        homework_statuses = requests.get(url=ENDPOINT, headers=HEADERS, params=params)
+        homework_statuses = requests.get(
+            url=ENDPOINT,
+            headers=HEADERS,
+            params=params
+        )
     except requests.exceptions.RequestException as error:
         logging.error(
             f'Ошибка при запросе к API: {error}'

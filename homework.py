@@ -22,7 +22,6 @@ ENV_VARS = ['PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID']
 RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
-# BOT = telegram.Bot(token=TELEGRAM_TOKEN)
 
 
 HOMEWORK_VERDICTS = {
@@ -31,54 +30,39 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-# logging.basicConfig(
-#     level=logging.INFO,
-#     # filename='main.log',
-#     format='%(asctime)s - %(levelname)s - %(message)s',
-# )
-
-# logger = logging.getLogger(__name__)
-# logger.setLevel(logging.INFO)
-# handler = StreamHandler(sys.stdout)
-# logger.addHandler(handler)
-# formatter = logging.Formatter(
-#     '%(asctime)s - %(levelname)s - %(message)s'
-# )
-# handler.setFormatter(formatter)
-# encode='utf-8'
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename='main.log',
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
-# logger = logging.getLogger(__name__)
-# logger.setLevel(logging.INFO)
-# handler = logging.StreamHandler(sys.stdout)
-# logger.addHandler(handler)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-handlers = [
-    logging.FileHandler('bot.log'),
-    logging.StreamHandler(sys.stdout)
-]
+handlers = logging.StreamHandler(sys.stdout)
 logger.addHandler(handlers)
+encode='utf-8'
 
 
 def check_tokens():
     """Проверка наличия токена в ENV."""
     # return all[ENV_VARS]
-    return all([PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID])
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
-        logging.debug(f'Сообщение отправлено в чат: {message}')
+        logging.debug(
+            f'Сообщение отправлено в чат: {message}'
+        )
     except telegram.error.TelegramError as error:
-        logging.error(f'Ошибка при отправке сообщения в чат: {error}')
-        er_message = f'Ошибка при отправке сообщения в чат: {error}'
-        raise exceptions.SendMessageError(er_message)
+        logging.error(
+            f'Ошибка при отправке сообщения в чат: {error}'
+        )
+        raise exceptions.SendMessageError(
+            f'Ошибка при отправке сообщения в чат: {error}'
+        )
 
 
 def get_api_answer(timestamp):
@@ -91,10 +75,17 @@ def get_api_answer(timestamp):
             params=params
         )
     except requests.exceptions.RequestException as error:
-        error_message = f'Ошибка при запросе к API: {error}'
-        raise exceptions.BadHttpStatus(error_message)
+        logging.error(
+            f'Ошибка при запросе к API: {error}'
+        )
+        raise exceptions.BadHttpStatus(
+            f'Ошибка при запросе к API: {error}'
+        )
     status_code = homework_statuses.status_code
     if status_code != HTTPStatus.OK:
+        logging.error(
+            f'"{ENDPOINT}" - недоступен. Код ответа API: {status_code}'
+        )
         raise exceptions.BadHttpStatus(
             f'"{ENDPOINT}" - недоступен. Код ответа API: {status_code}'
         )
@@ -123,13 +114,22 @@ def check_response(response):
 def parse_status(homework):
     """Проверка статуса HW."""
     if 'homework_name' not in homework:
-        raise KeyError('Отсутствует ключ "homework_name" в ответе API')
+        raise KeyError(
+            'Отсутствует ключ "homework_name" в ответе API'
+        )
     if 'status' not in homework:
-        raise KeyError('Отсутствует ключ "status" в ответе API')
+        raise KeyError(
+            'Отсутствует ключ "status" в ответе API'
+        )
     homework_name = homework['homework_name']
     homework_status = homework['status']
     if homework_status not in HOMEWORK_VERDICTS:
-        raise exceptions.UnknownHomeworkStatus
+        logging.error(
+            'неожиданный статус домашней работы, обнаруженный в ответе API'
+        )
+        raise exceptions.UnknownHomeworkStatus(
+            'неожиданный статус домашней работы, обнаруженный в ответе API'
+        )
     verdict = HOMEWORK_VERDICTS[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 

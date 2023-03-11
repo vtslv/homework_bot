@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 handlers = logging.StreamHandler(sys.stdout)
 logger.addHandler(handlers)
-encode='utf-8'
+encode = 'utf-8'
 
 
 def check_tokens():

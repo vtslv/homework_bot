@@ -9,6 +9,7 @@ import telegram
 
 from dotenv import load_dotenv
 from http import HTTPStatus
+from logging.handlers import RotatingFileHandler
 
 load_dotenv()
 
@@ -31,23 +32,23 @@ HOMEWORK_VERDICTS = {
 }
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     filename='main.log',
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s [%(levelname)s] %(funcName)s, Line-%(lineno)s, message-%(message)s',
+    filemode='w',
+    encoding = 'UTF-8'
 )
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-handlers = logging.StreamHandler(sys.stdout)
-logger.addHandler(handlers)
-encode = 'utf-8'
+handler = logging.StreamHandler(sys.stdout)
+logger.addHandler(handler)
 
 
 def check_tokens():
     """Проверка наличия токена в ENV."""
     # return all[ENV_VARS]
-    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
-
+    # return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
+    return PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID
 
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
@@ -69,11 +70,7 @@ def get_api_answer(timestamp):
     """Делает запрос к единственному эндпоинту API-сервиса."""
     params = {'from_date': timestamp}
     try:
-        homework_statuses = requests.get(
-            url=ENDPOINT,
-            headers=HEADERS,
-            params=params
-        )
+        homework_statuses = requests.get(url=ENDPOINT, headers=HEADERS, params=params)
     except requests.exceptions.RequestException as error:
         logging.error(
             f'Ошибка при запросе к API: {error}'
@@ -98,6 +95,9 @@ def check_response(response):
         raise TypeError(
             f'ответ сервиса не словарь. {response}'
         )
+    # if 'homeworks' not in response:
+    #     raise KeyError('Отсутствует ключ "homework_name" в ответе API')
+    # homeworks = response['homeworks']
     try:
         homeworks = response['homeworks']
     except KeyError:
@@ -136,10 +136,12 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-    if not check_tokens():
-        logging.critical('Отсутствуют переменные окружения')
-        raise SystemExit('Отсутствуют переменные окружения')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    if not check_tokens():
+        er_message = 'Отсутствуют переменные окружения'
+        logging.critical(er_message)
+        send_message(bot, er_message)
+        sys.exit('Отсутствуют переменные окружения')
     current_timestamp = int(time.time())
     prev_verdict = ''
     while True:
@@ -147,8 +149,13 @@ def main():
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
             current_timestamp = response.get('current_date', int(time.time()))
-            if not homeworks:
+            # if not homeworks:
+            if len(homeworks) == 0:
                 logging.debug('Список пуст')
+                len_message = 'Список пуст'
+                if len_message != prev_verdict:
+                    send_message(bot, len_message)
+                    prev_verdict = len_message
                 continue
             verdict = parse_status(homeworks[0])
             if verdict != prev_verdict:
@@ -160,11 +167,11 @@ def main():
             )
             logging.error(error_message)
         except Exception as error:
-            message = f'Сбой в работе бота: {error}'
-            logging.error(message)
-            if message != prev_verdict:
-                send_message(bot, message)
-                prev_verdict = message
+            er_message = f'Сбой в работе бота: {error}'
+            logging.error(er_message)
+            if er_message != prev_verdict:
+                send_message(bot, er_message)
+                prev_verdict = er_message
         time.sleep(RETRY_PERIOD)
 
 

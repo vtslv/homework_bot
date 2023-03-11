@@ -84,10 +84,10 @@ def get_api_answer(timestamp):
     status_code = homework_statuses.status_code
     if status_code != HTTPStatus.OK:
         logging.error(
-            f'"{ENDPOINT}" - недоступен. Код ответа API: {status_code}'
+            f'{ENDPOINT} - недоступен. Код ответа API: {status_code}'
         )
         raise exceptions.BadHttpStatus(
-            f'"{ENDPOINT}" - недоступен. Код ответа API: {status_code}'
+            f'{ENDPOINT} - недоступен. Код ответа API: {status_code}'
         )
     return homework_statuses.json()
 

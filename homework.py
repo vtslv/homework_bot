@@ -150,14 +150,12 @@ def main():
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
             current_timestamp = response.get('current_date', int(time.time()))
-            # if not homeworks:
             if len(homeworks) == 0:
                 logging.debug('Список пуст')
                 len_message = 'Список пуст'
                 if len_message != prev_verdict:
                     send_message(bot, len_message)
                     prev_verdict = len_message
-                # continue
             verdict = parse_status(homeworks[0])
             if verdict != prev_verdict:
                 send_message(bot, verdict)

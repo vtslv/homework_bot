@@ -22,6 +22,7 @@ ENV_VARS = ['PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID']
 RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
+FROM_DATE = 1675719091
 
 
 HOMEWORK_VERDICTS = {
@@ -46,8 +47,6 @@ logger.addHandler(handler)
 
 def check_tokens():
     """Проверка наличия токена в ENV."""
-    # return all[ENV_VARS]
-    # return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
     return PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID
 
 
@@ -100,9 +99,6 @@ def check_response(response):
         raise TypeError(
             f'ответ сервиса не словарь. {response}'
         )
-    # if 'homeworks' not in response:
-    #     raise KeyError('Отсутствует ключ "homework_name" в ответе API')
-    # homeworks = response['homeworks']
     try:
         homeworks = response['homeworks']
     except KeyError:
@@ -161,7 +157,7 @@ def main():
                 if len_message != prev_verdict:
                     send_message(bot, len_message)
                     prev_verdict = len_message
-                continue
+                # continue
             verdict = parse_status(homeworks[0])
             if verdict != prev_verdict:
                 send_message(bot, verdict)

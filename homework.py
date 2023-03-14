@@ -31,14 +31,6 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    filename='main.log',
-    format='%(asctime)s [%(levelname)s] %(funcName)s,'
-    'Line-%(lineno)s, message-%(message)s',
-    filemode='w',
-    encoding='UTF-8'
-)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 handler = logging.StreamHandler(sys.stdout)
@@ -47,22 +39,26 @@ logger.addHandler(handler)
 
 def check_tokens():
     """Проверка наличия токена в ENV."""
-    return PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID
+    # return all([ENV_VARS])  ????????????????????? так не работает -
+    # 'Убедитесь, что при запуске бота без переменных окружения '
+    # 'программа принудительно останавливается.'
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
     try:
+        logger.info('Начало отправки сообщения')
         bot.send_message(TELEGRAM_CHAT_ID, message)
-        logging.debug(
-            f'Сообщение отправлено в чат: {message}'
-        )
     except telegram.error.TelegramError as error:
-        logging.error(
+        error_message = (
             f'Ошибка при отправке сообщения в чат: {error}'
         )
-        raise exceptions.SendMessageError(
-            f'Ошибка при отправке сообщения в чат: {error}'
+        logger.error(error_message)
+        raise exceptions.SendMessageError(error_message)
+    else:
+        logging.debug(
+            f'Сообщение Успешно отправлено в чат: {message}'
         )
 
 
@@ -76,20 +72,16 @@ def get_api_answer(timestamp):
             params=params
         )
     except requests.exceptions.RequestException as error:
-        logging.error(
+        error_message = (
             f'Ошибка при запросе к API: {error}'
         )
-        raise exceptions.BadHttpStatus(
-            f'Ошибка при запросе к API: {error}'
-        )
+        raise exceptions.BadHttpStatus(error_message)
     status_code = homework_statuses.status_code
     if status_code != HTTPStatus.OK:
-        logging.error(
+        error_message = (
             f'{ENDPOINT} - недоступен. Код ответа API: {status_code}'
         )
-        raise exceptions.BadHttpStatus(
-            f'{ENDPOINT} - недоступен. Код ответа API: {status_code}'
-        )
+        raise exceptions.BadHttpStatus(error_message)
     return homework_statuses.json()
 
 
@@ -99,10 +91,9 @@ def check_response(response):
         raise TypeError(
             f'ответ сервиса не словарь. {response}'
         )
-    try:
-        homeworks = response['homeworks']
-    except KeyError:
-        logging.error(
+    homeworks = response.get('homeworks')
+    if 'homeworks' not in response:
+        raise exceptions.ResponceKeyError(
             'Ошибка ключа: нет "homeworks"'
         )
     if not isinstance(homeworks, list):
@@ -125,24 +116,21 @@ def parse_status(homework):
     homework_name = homework['homework_name']
     homework_status = homework['status']
     if homework_status not in HOMEWORK_VERDICTS:
-        logging.error(
+        error_message = (
             'неожиданный статус домашней работы, обнаруженный в ответе API'
         )
-        raise exceptions.UnknownHomeworkStatus(
-            'неожиданный статус домашней работы, обнаруженный в ответе API'
-        )
+        raise exceptions.UnknownHomeworkStatus(error_message)
     verdict = HOMEWORK_VERDICTS[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def main():
     """Основная логика работы бота."""
-    bot = telegram.Bot(token=TELEGRAM_TOKEN)
     if not check_tokens():
-        er_message = 'Отсутствуют переменные окружения'
-        logging.critical(er_message)
-        send_message(bot, er_message)
+        error_message = 'Отсутствуют переменные окружения'
+        logger.critical(error_message)
         sys.exit('Отсутствуют переменные окружения')
+    bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
     prev_verdict = ''
     while True:
@@ -150,29 +138,38 @@ def main():
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
             current_timestamp = response.get('current_date', int(time.time()))
-            if len(homeworks) == 0:
-                logging.debug('Список пуст')
-                len_message = 'Список пуст'
-                if len_message != prev_verdict:
-                    send_message(bot, len_message)
-                    prev_verdict = len_message
-            verdict = parse_status(homeworks[0])
-            if verdict != prev_verdict:
+            if len(homeworks) > 0:
+                verdict = parse_status(homeworks[0])
                 send_message(bot, verdict)
                 prev_verdict = verdict
-        except exceptions.SendMessageError as error:
-            error_message = (
-                f'Ошибка при отправке сообщения: {error}'
-            )
-            logging.error(error_message)
+                logger.info('Получен статус')
+            else:
+                len_message = 'Статус не обновлен'
+                logger.debug(len_message)
+                send_message(bot, len_message)
+                prev_verdict = len_message
+                logger.info(len_message)
+        # except exceptions.SendMessageError as error:
+        #     error_message = (
+        #         f'Ошибка при отправке сообщения: {error}'
+        #     )
+        #     logger.error(error_message)
         except Exception as error:
-            er_message = f'Сбой в работе бота: {error}'
-            logging.error(er_message)
-            if er_message != prev_verdict:
-                send_message(bot, er_message)
-                prev_verdict = er_message
+            error_message = f'Сбой в работе бота: {error}'
+            logger.error(error_message)
+            if error_message != prev_verdict:
+                send_message(bot, error_message)
+                prev_verdict = error_message
         time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.INFO,
+        filename='main.log',
+        format='%(asctime)s [%(levelname)s] %(funcName)s,'
+        'Line-%(lineno)s, message-%(message)s',
+        filemode='w',
+        encoding='UTF-8'
+    )
     main()

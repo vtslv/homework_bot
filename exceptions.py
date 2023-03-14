@@ -17,3 +17,8 @@ class UnknownHomeworkStatus(Exception):
     '''Ошибка. Неизвестный статус ДЗ.'''
 
     pass
+
+class ResponceKeyError(Exception):
+    '''Ошибка. В ответе нет ключа Homeworks.'''
+
+    pass

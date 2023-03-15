@@ -4,6 +4,7 @@ import sys
 import time
 
 import exceptions
+import json
 import requests
 import telegram
 
@@ -17,7 +18,7 @@ PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-ENV_VARS = ['PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID']
+ENV_VARS = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
 
 RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
@@ -39,7 +40,7 @@ logger.addHandler(handler)
 
 def check_tokens():
     """Проверка наличия токена в ENV."""
-    # return all([ENV_VARS])  ????????????????????? так не работает -
+    # return all(ENV_VARS)  # ????????????????????? так не работает -
     # 'Убедитесь, что при запуске бота без переменных окружения '
     # 'программа принудительно останавливается.'
     return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
@@ -82,7 +83,14 @@ def get_api_answer(timestamp):
             f'{ENDPOINT} - недоступен. Код ответа API: {status_code}'
         )
         raise exceptions.BadHttpStatus(error_message)
-    return homework_statuses.json()
+    try:
+        response = homework_statuses.json()
+    except json.JSONDecodeError as error:
+        json_error_message = (
+            f'данные не являются допустимым форматом JSON: {error}'
+        )
+        logger.error(json_error_message)
+    return response
 
 
 def check_response(response):
@@ -93,7 +101,7 @@ def check_response(response):
         )
     homeworks = response.get('homeworks')
     if 'homeworks' not in response:
-        raise exceptions.ResponceKeyError(
+        raise KeyError(
             'Ошибка ключа: нет "homeworks"'
         )
     if not isinstance(homeworks, list):
@@ -144,23 +152,19 @@ def main():
                 prev_verdict = verdict
                 logger.info('Получен статус')
             else:
-                len_message = 'Статус не обновлен'
-                logger.debug(len_message)
-                send_message(bot, len_message)
-                prev_verdict = len_message
-                logger.info(len_message)
-        # except exceptions.SendMessageError as error:
-        #     error_message = (
-        #         f'Ошибка при отправке сообщения: {error}'
-        #     )
-        #     logger.error(error_message)
+                status_message = 'Статус не обновлен'
+                logger.debug(status_message)
+                send_message(bot, status_message)
+                prev_verdict = status_message
+                logger.info(status_message)
         except Exception as error:
             error_message = f'Сбой в работе бота: {error}'
             logger.error(error_message)
             if error_message != prev_verdict:
                 send_message(bot, error_message)
                 prev_verdict = error_message
-        time.sleep(RETRY_PERIOD)
+        finally:
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
